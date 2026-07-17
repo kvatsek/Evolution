@@ -1,0 +1,86 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #1a1a2e;
+}
+
+.game {
+  background: #fff;
+  padding: 2rem 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  min-width: 320px;
+}
+
+h1 {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+}
+
+.score {
+  font-size: 1.1rem;
+  margin: 0 0 1.5rem;
+  color: #555;
+}
+
+#score {
+  font-weight: 700;
+  color: #667eea;
+}
+
+.problem {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 1.5rem;
+  letter-spacing: 0.05em;
+}
+
+#answer-form {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+#answer-input {
+  width: 120px;
+  padding: 0.6rem 0.8rem;
+  font-size: 1.1rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  text-align: center;
+}
+
+#answer-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+button {
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  background: #667eea;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #5a6fd6;
+}
+
+.error {
+  margin: 1rem 0 0;
+  color: #e53935;
+  font-size: 0.95rem;
+}

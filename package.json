@@ -1,0 +1,19 @@
+{
+  "name": "math-game",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "devDependencies": {
+    "happy-dom": "^17.4.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vitest": "^3.0.5"
+  }
+}

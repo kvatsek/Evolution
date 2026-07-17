@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Игра: сложение до 10</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div class="game">
+      <h1>Сложение до 10</h1>
+      <p class="score">Очки: <span id="score">0</span></p>
+      <p class="problem" id="problem"></p>
+      <form id="answer-form">
+        <input
+          id="answer-input"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="Ваш ответ"
+          autofocus
+        />
+        <button type="submit">Ответить</button>
+      </form>
+      <p class="error" id="error" hidden></p>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
