@@ -6,12 +6,13 @@ import {
   handleLogin,
   handleSaveScore,
   handleMe,
+  handleUsers,
 } from "./api";
 import { createSession } from "./session";
 import { appendFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
-const TEST_CSV = join(process.cwd(), "data", "users.csv");
+const TEST_CSV = join(process.cwd(), "data", "users.test.csv");
 
 function ensureDataDir(): void {
   const dataDir = join(process.cwd(), "data");
@@ -188,6 +189,39 @@ describe("api", () => {
       await handleMe(req, mock.res);
 
       expect(mock._status).toBe(401);
+    });
+  });
+
+  describe("handleUsers", () => {
+    it("возвращает список логинов пользователей", async () => {
+      // Сначала регистрируем двух пользователей
+      const regReq1 = createMockReq({ login: "alice", password: "secret" });
+      const regMock1 = createMockRes();
+      await handleRegister(regReq1, regMock1.res);
+
+      const regReq2 = createMockReq({ login: "bob", password: "secret" });
+      const regMock2 = createMockRes();
+      await handleRegister(regReq2, regMock2.res);
+
+      // Теперь запрашиваем список
+      const usersReq = createMockReq({});
+      const usersMock = createMockRes();
+      await handleUsers(usersReq, usersMock.res);
+
+      expect(usersMock._status).toBe(200);
+      const parsed = JSON.parse(usersMock._data);
+      expect(parsed.users).toContain("alice");
+      expect(parsed.users).toContain("bob");
+    });
+
+    it("возвращает пустой список, если пользователей нет", async () => {
+      const usersReq = createMockReq({});
+      const usersMock = createMockRes();
+      await handleUsers(usersReq, usersMock.res);
+
+      expect(usersMock._status).toBe(200);
+      const parsed = JSON.parse(usersMock._data);
+      expect(parsed.users).toEqual([]);
     });
   });
 });

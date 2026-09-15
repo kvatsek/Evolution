@@ -11,7 +11,7 @@ import { generateToken, createSession, isSessionValid, extractLoginByToken } fro
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
-const TEST_CSV = join(process.cwd(), "data", "users.csv");
+const TEST_CSV = join(process.cwd(), "data", "users.test.csv");
 
 function ensureDataDir(): void {
   const dataDir = join(process.cwd(), "data");

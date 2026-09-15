@@ -119,6 +119,8 @@ finishButton.addEventListener("click", endGame);
 
 /** Переключает на экран входа, очищая данные текущей сессии. */
 switchUserButton.addEventListener("click", () => {
+  score = 0;
+  isGameOver = false;
   localStorage.removeItem("authToken");
   localStorage.removeItem("authLogin");
   showLogin();

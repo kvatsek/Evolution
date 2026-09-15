@@ -3,20 +3,25 @@ import { join } from "node:path";
 import type { User } from "./types";
 
 const DATA_DIR = join(process.cwd(), "data");
-const USERS_CSV = join(DATA_DIR, "users.csv");
 const HEADER = "login,passwordHash,lastLogin,totalScore";
+
+/** Возвращает путь к CSV-файлу (тестовый или продакшн). */
+function getUsersCsvPath(): string {
+  return join(DATA_DIR, process.env.TEST_USERS_CSV ?? "users.csv");
+}
 
 /** Гарантирует, что директория data/ существует. */
 function ensureDataDir(): void {
+  const csvPath = getUsersCsvPath();
   if (!existsSync(DATA_DIR)) {
-    appendFileSync(USERS_CSV, HEADER + "\n");
+    appendFileSync(csvPath, HEADER + "\n");
   }
 }
 
 /** Читает всех пользователей из CSV. */
 export function readUsers(): User[] {
   ensureDataDir();
-  const content = readFileSync(USERS_CSV, "utf-8");
+  const content = readFileSync(getUsersCsvPath(), "utf-8");
   const lines = content
     .split("\n")
     .map((line) => line.trim())
@@ -36,11 +41,12 @@ export function readUsers(): User[] {
 /** Записывает всех пользователей в CSV (перезаписывает файл). */
 export function writeUsers(users: User[]): void {
   ensureDataDir();
+  const csvPath = getUsersCsvPath();
   const lines = [HEADER];
   for (const user of users) {
     lines.push(`${user.login},${user.passwordHash},${user.lastLogin},${user.totalScore}`);
   }
-  writeFileSync(USERS_CSV, lines.join("\n") + "\n", "utf-8");
+  writeFileSync(csvPath, lines.join("\n") + "\n", "utf-8");
 }
 
 /** Ищет пользователя по логину. Возвращает undefined, если не найден. */
