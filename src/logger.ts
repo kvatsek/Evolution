@@ -27,3 +27,12 @@ export function logEnd(): void {
     console.error("Ошибка при записи в лог (end):", err);
   }
 }
+
+/** Записывает факт входа пользователя. */
+export function logLogin(login: string): void {
+  try {
+    logMessage(`Вход: ${login}`);
+  } catch (err) {
+    console.error("Ошибка при записи в лог (login):", err);
+  }
+}

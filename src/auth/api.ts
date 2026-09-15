@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { generateSalt, hashPassword, verifyPassword } from "./crypto";
 import { addUser, findUserByLogin, readUsers, updateUser } from "./csv";
 import { createSession, extractLoginByToken } from "./session";
+import { logLogin } from "../logger.js";
 import type {
   LoginResponse,
   MeResponse,
@@ -113,6 +114,7 @@ export async function handleLogin(
 
   const session = createSession(login);
 
+  logLogin(user.login);
   const newLastLogin = new Date().toISOString();
   updateUser(login, {
     lastLogin: newLastLogin,
