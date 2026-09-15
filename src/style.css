@@ -79,8 +79,61 @@ button:hover {
   background: #5a6fd6;
 }
 
+.finish-button {
+  display: block;
+  margin: 1rem auto 0;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  background: transparent;
+  color: #e53935;
+  border: 2px solid #e53935;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.finish-button:hover {
+  background: #e53935;
+  color: #fff;
+}
+
 .error {
   margin: 1rem 0 0;
   color: #e53935;
   font-size: 0.95rem;
+}
+
+.game-end {
+  background: #fff;
+  padding: 2rem 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  min-width: 320px;
+}
+
+.final-score {
+  font-size: 1.3rem;
+  margin: 1.5rem 0;
+  color: #555;
+}
+
+#final-score {
+  font-weight: 700;
+  color: #667eea;
+  font-size: 1.5rem;
+}
+
+#restart-button {
+  margin-top: 1rem;
+  padding: 0.8rem 2rem;
+  font-size: 1.1rem;
+  background: #667eea;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#restart-button:hover {
+  background: #5a6fd6;
 }

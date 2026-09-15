@@ -22,7 +22,14 @@
         />
         <button type="submit">Ответить</button>
       </form>
+      <button id="finish-button" class="finish-button">Завершить игру</button>
       <p class="error" id="error" hidden></p>
+    </div>
+
+    <div class="game-end" id="game-end" hidden>
+      <h1>Игра завершена</h1>
+      <p class="final-score">Ваш счёт: <span id="final-score">0</span></p>
+      <button id="restart-button">Начать заново</button>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
