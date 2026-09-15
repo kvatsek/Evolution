@@ -7,8 +7,34 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div class="game">
+    <div class="login-screen" id="login-screen" hidden>
+      <h1>Вход</h1>
+      <input id="login-input" type="text" placeholder="Логин" />
+      <select id="login-select" hidden>
+        <option value="">— или выберите из списка —</option>
+      </select>
+      <input id="login-password" type="password" placeholder="Пароль" />
+      <div class="login-buttons">
+        <button id="login-submit">Войти</button>
+        <button id="login-register">Зарегистрироваться</button>
+      </div>
+      <p class="error" id="login-error" hidden></p>
+    </div>
+
+    <div class="login-screen" id="register-screen" hidden>
+      <h1>Регистрация</h1>
+      <input id="register-login" type="text" placeholder="Логин" />
+      <input id="register-password" type="password" placeholder="Пароль" />
+      <div class="login-buttons">
+        <button id="register-submit">Зарегистрироваться</button>
+        <button id="register-back">Назад</button>
+      </div>
+      <p class="error" id="register-error" hidden></p>
+    </div>
+
+    <div class="game" id="game" hidden>
       <h1>Сложение до 10</h1>
+      <p id="user-login"></p>
       <p class="score">Очки: <span id="score">0</span></p>
       <p class="problem" id="problem"></p>
       <form id="answer-form">
@@ -29,7 +55,11 @@
     <div class="game-end" id="game-end" hidden>
       <h1>Игра завершена</h1>
       <p class="final-score">Ваш счёт: <span id="final-score">0</span></p>
-      <button id="restart-button">Начать заново</button>
+      <p class="error" id="save-error" hidden></p>
+      <div class="game-end-buttons">
+        <button id="restart-button">Начать заново</button>
+        <button id="switch-user-button">Сменить пользователя</button>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

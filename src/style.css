@@ -13,6 +13,101 @@ body {
   color: #1a1a2e;
 }
 
+.login-screen,
+#register-screen {
+  background: #fff;
+  padding: 2rem 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  min-width: 320px;
+}
+
+.login-screen h1 {
+  margin: 0 0 1.5rem;
+  font-size: 1.5rem;
+}
+
+#login-select {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 0.8rem;
+  background: #fff;
+}
+
+#login-select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+#login-input {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 0.8rem;
+}
+
+#login-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+#login-password {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  font-size: 1rem;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+#login-password:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.login-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+#login-submit {
+  flex: 1;
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  background: #667eea;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#login-submit:hover {
+  background: #5a6fd6;
+}
+
+#login-register {
+  flex: 1;
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  background: transparent;
+  color: #667eea;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#login-register:hover {
+  background: #667eea;
+  color: #fff;
+}
+
 .game {
   background: #fff;
   padding: 2rem 2.5rem;
@@ -25,6 +120,12 @@ body {
 h1 {
   margin: 0 0 1rem;
   font-size: 1.5rem;
+}
+
+#user-login {
+  font-size: 0.95rem;
+  color: #888;
+  margin: 0 0 0.5rem;
 }
 
 .score {
@@ -136,4 +237,27 @@ button:hover {
 
 #restart-button:hover {
   background: #5a6fd6;
+}
+
+.game-end-buttons {
+  display: flex;
+  gap: 0.8rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+#switch-user-button {
+  flex: 1;
+  padding: 0.8rem 2rem;
+  font-size: 1.1rem;
+  background: transparent;
+  color: #667eea;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#switch-user-button:hover {
+  background: #667eea;
+  color: #fff;
 }

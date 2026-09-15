@@ -1,30 +1,20 @@
 import { logEnd, logStart } from "./src/logger.js";
-import { spawn } from "node:child_process";
+import { startServer } from "./src/server.js";
 
 logStart();
 
-const child = spawn("vite", ["--port", "3000"], {
-  stdio: "inherit",
-  shell: true,
-});
-
-let isShuttingDown = false;
-
-function shutdown(code?: number): void {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
+startServer().catch((err) => {
+  console.error("Ошибка запуска сервера:", err);
   logEnd();
-  process.exit(code ?? 0);
-}
-
-child.on("close", (code) => {
-  shutdown(code);
+  process.exit(1);
 });
 
 process.on("SIGINT", () => {
-  child.kill("SIGINT");
+  logEnd();
+  process.exit(0);
 });
 
 process.on("SIGTERM", () => {
-  child.kill("SIGTERM");
+  logEnd();
+  process.exit(0);
 });
