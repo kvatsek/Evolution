@@ -50,3 +50,14 @@ export interface MeResponse {
 export interface ErrorResponse {
   error: string;
 }
+
+/** Запись веса примера. */
+export interface WeightEntry {
+  expression: string;
+  weight: number;
+}
+
+/** Ответ API на отправку ответа. */
+export interface SubmitAnswerResponse {
+  newWeights: WeightEntry[];
+}

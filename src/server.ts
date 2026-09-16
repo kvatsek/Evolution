@@ -4,11 +4,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { logEnd, logStart } from "./logger.js";
 import {
+  handleGetWeights,
   handleLogin,
   handleMe,
   handleRegister,
   handleSaveScore,
   handleUsers,
+  handleSubmitAnswer,
 } from "./auth/api.js";
 
 /** Маршрутизирует API запросы к соответствующим обработчикам. */
@@ -27,8 +29,12 @@ async function handleApiRequest(
     await handleLogin(req, res);
   } else if (method === "POST" && fullPath === "/api/save-score") {
     await handleSaveScore(req, res);
+  } else if (method === "POST" && fullPath === "/api/submit-answer") {
+    await handleSubmitAnswer(req, res);
   } else if (method === "GET" && fullPath === "/api/me") {
     await handleMe(req, res);
+  } else if (method === "GET" && fullPath === "/api/weights") {
+    await handleGetWeights(req, res);
   } else if (method === "GET" && fullPath === "/api/users") {
     await handleUsers(req, res);
   } else {

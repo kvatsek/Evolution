@@ -8,6 +8,10 @@ import {
   processSubmit,
   showError,
   updateScore,
+  parseExpression,
+  pickWeightedProblem,
+  adjustWeight,
+  applyGlobalReduction,
 } from "./game";
 
 describe("isValidNumber", () => {
@@ -117,5 +121,166 @@ describe("processSubmit", () => {
 describe("formatGameEndMessage", () => {
   it("формирует сообщение об окончании игры", () => {
     expect(formatGameEndMessage(7)).toBe("Игра завершена. Итоговый счёт: 7");
+  });
+});
+
+describe("parseExpression", () => {
+  it("парсит выражение вида a+b", () => {
+    expect(parseExpression("2+3")).toEqual({ a: 2, b: 3 });
+  });
+
+  it("парсит выражения с нулями", () => {
+    expect(parseExpression("0+0")).toEqual({ a: 0, b: 0 });
+    expect(parseExpression("0+10")).toEqual({ a: 0, b: 10 });
+  });
+
+  it("парсит максимальные значения", () => {
+    expect(parseExpression("5+5")).toEqual({ a: 5, b: 5 });
+    expect(parseExpression("10+0")).toEqual({ a: 10, b: 0 });
+  });
+});
+
+describe("pickWeightedProblem", () => {
+  it("возвращает null когда все веса 0", () => {
+    const expressions = ["1+2", "3+4"];
+    const weights = new Map<string, number>();
+    weights.set("1+2", 0);
+    weights.set("3+4", 0);
+
+    const result = pickWeightedProblem(expressions, weights);
+    expect(result).toBeNull();
+  });
+
+  it("выбирает пример с весом > 0", () => {
+    const expressions = ["1+2", "3+4"];
+    const weights = new Map<string, number>();
+    weights.set("1+2", 5);
+    weights.set("3+4", 0);
+
+    const result = pickWeightedProblem(expressions, weights);
+    expect(result).not.toBeNull();
+    expect(result?.expression).toBe("1+2");
+  });
+
+  it("выбирает пример пропорционально весу", () => {
+    const expressions = ["1+2", "3+4"];
+    const weights = new Map<string, number>();
+    weights.set("1+2", 9);
+    weights.set("3+4", 1);
+
+    // При 100 итерациях с random() = 0 должен выбирать "1+2" (вес 9 из 10)
+    const random = vi.fn().mockReturnValue(0);
+    const result = pickWeightedProblem(expressions, weights, random);
+    expect(result?.expression).toBe("1+2");
+  });
+
+  it("выбирает пример с меньшим весом при случайном значении", () => {
+    const expressions = ["1+2", "3+4"];
+    const weights = new Map<string, number>();
+    weights.set("1+2", 5);
+    weights.set("3+4", 5);
+
+    // random = 0.9 -> 0.9 * 10 = 9, 9 >= 5 (первый), значит выбираем второй
+    const random = vi.fn().mockReturnValue(0.9);
+    const result = pickWeightedProblem(expressions, weights, random);
+    expect(result?.expression).toBe("3+4");
+  });
+
+  it("возвращает правильные операнды из выражения", () => {
+    const expressions = ["0+0", "1+2", "3+4", "5+5", "10+0"];
+    const weights = new Map<string, number>();
+    for (const expr of expressions) {
+      weights.set(expr, 5);
+    }
+
+    const random = vi.fn().mockReturnValue(0);
+    const result = pickWeightedProblem(expressions, weights, random);
+    expect(result).not.toBeNull();
+    expect(result!.a + result!.b).toBeLessThanOrEqual(10);
+  });
+});
+
+describe("adjustWeight", () => {
+  it("уменьшает вес на 1 при верном ответе", () => {
+    const weights = new Map<string, number>();
+    weights.set("2+3", 5);
+
+    adjustWeight(weights, "2+3", true);
+    expect(weights.get("2+3")).toBe(4);
+  });
+
+  it("увеличивает вес на 2 при неверном ответе", () => {
+    const weights = new Map<string, number>();
+    weights.set("2+3", 5);
+
+    adjustWeight(weights, "2+3", false);
+    expect(weights.get("2+3")).toBe(7);
+  });
+
+  it("не опускает вес ниже 0", () => {
+    const weights = new Map<string, number>();
+    weights.set("2+3", 0);
+
+    adjustWeight(weights, "2+3", true);
+    expect(weights.get("2+3")).toBe(0);
+  });
+
+  it("не поднимает вес выше 10", () => {
+    const weights = new Map<string, number>();
+    weights.set("2+3", 10);
+
+    adjustWeight(weights, "2+3", false);
+    expect(weights.get("2+3")).toBe(10);
+  });
+
+  it("обрабатывает выражение с весом по умолчанию 0", () => {
+    const weights = new Map<string, number>();
+
+    adjustWeight(weights, "2+3", false);
+    expect(weights.get("2+3")).toBe(2);
+  });
+});
+
+describe("applyGlobalReduction", () => {
+  it("снижает все веса на 1 при достижении порога 10", () => {
+    const weights = new Map<string, number>();
+    weights.set("1+2", 5);
+    weights.set("3+4", 7);
+    weights.set("5+5", 3);
+
+    const result = applyGlobalReduction(weights, 9);
+    expect(result).toBe(0); // Сброс счётчика
+    expect(weights.get("1+2")).toBe(4);
+    expect(weights.get("3+4")).toBe(6);
+    expect(weights.get("5+5")).toBe(2);
+  });
+
+  it("инкрементирует счётчик при пороге не достигнут", () => {
+    const weights = new Map<string, number>();
+    weights.set("1+2", 5);
+
+    const result = applyGlobalReduction(weights, 0);
+    expect(result).toBe(1);
+    expect(weights.get("1+2")).toBe(5); // Вес не изменился
+  });
+
+  it("не опускает веса ниже 0 при глобальном снижении", () => {
+    const weights = new Map<string, number>();
+    weights.set("1+2", 0);
+    weights.set("3+4", 5);
+
+    const result = applyGlobalReduction(weights, 9);
+    expect(result).toBe(0);
+    expect(weights.get("1+2")).toBe(0); // Не ниже 0
+    expect(weights.get("3+4")).toBe(4);
+  });
+
+  it("работает с порогом по умолчанию 10", () => {
+    const weights = new Map<string, number>();
+    weights.set("1+2", 5);
+
+    const result = applyGlobalReduction(weights, 9);
+    expect(result).toBe(0);
+    expect(weights.get("1+2")).toBe(4);
   });
 });

@@ -7,10 +7,13 @@ import {
   handleSaveScore,
   handleMe,
   handleUsers,
+  handleSubmitAnswer,
+  handleGetWeights,
 } from "./api";
 import { createSession } from "./session";
 import { appendFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { readUserWeights } from "./csv";
 
 const TEST_CSV = join(process.cwd(), "data", "users.test.csv");
 
@@ -222,6 +225,205 @@ describe("api", () => {
       expect(usersMock._status).toBe(200);
       const parsed = JSON.parse(usersMock._data);
       expect(parsed.users).toEqual([]);
+    });
+  });
+
+  describe("handleSubmitAnswer", () => {
+    it("возвращает 401 без токена", async () => {
+      const req = createMockReq({ expression: "2+3", correct: true });
+      const mock = createMockRes();
+      await handleSubmitAnswer(req, mock.res);
+
+      expect(mock._status).toBe(401);
+    });
+
+    it("возвращает 400 при отсутствии выражения", async () => {
+      const token = createSession("ivan").token;
+      const req = createMockReq({ correct: true }, { authorization: `Bearer ${token}` });
+      const mock = createMockRes();
+      await handleSubmitAnswer(req, mock.res);
+
+      expect(mock._status).toBe(400);
+    });
+
+    it("корректно обрабатывает верный ответ", async () => {
+      // Сначала регистрируем пользователя
+      const regReq = createMockReq({ login: "ivan", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      // Создаём сессию
+      const token = createSession("ivan").token;
+
+      // Отправляем верный ответ
+      const submitReq = createMockReq(
+        { expression: "2+3", correct: true, correctStreak: 0 },
+        { authorization: `Bearer ${token}` }
+      );
+      const submitMock = createMockRes();
+      await handleSubmitAnswer(submitReq, submitMock.res);
+
+      expect(submitMock._status).toBe(200);
+      const parsed = JSON.parse(submitMock._data);
+      expect(parsed.newWeights).toBeDefined();
+      expect(Array.isArray(parsed.newWeights)).toBe(true);
+
+      // Проверяем, что вес для "2+3" уменьшился с 5 до 4
+      const weightEntry = parsed.newWeights.find(
+        (w: { expression: string }) => w.expression === "2+3"
+      );
+      expect(weightEntry).toBeDefined();
+      expect(weightEntry!.weight).toBe(4);
+    });
+
+    it("корректно обрабатывает неверный ответ", async () => {
+      // Сначала регистрируем пользователя
+      const regReq = createMockReq({ login: "bob", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      const token = createSession("bob").token;
+
+      // Отправляем неверный ответ
+      const submitReq = createMockReq(
+        { expression: "1+2", correct: false, correctStreak: 0 },
+        { authorization: `Bearer ${token}` }
+      );
+      const submitMock = createMockRes();
+      await handleSubmitAnswer(submitReq, submitMock.res);
+
+      expect(submitMock._status).toBe(200);
+      const parsed = JSON.parse(submitMock._data);
+
+      // Проверяем, что вес для "1+2" увеличился с 5 до 7
+      const weightEntry = parsed.newWeights.find((w: { expression: string }) => w.expression === "1+2");
+      expect(weightEntry).toBeDefined();
+      expect(weightEntry.weight).toBe(7);
+    });
+
+    it("создаёт файл весов при регистрации", async () => {
+      const regReq = createMockReq({ login: "charlie", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      expect(regMock._status).toBe(201);
+
+      // Проверяем, что файл весов создан
+      const weights = readUserWeights("charlie");
+      expect(weights.size).toBeGreaterThan(0);
+
+      // Все веса должны быть равны 5
+      for (const [, weight] of weights) {
+        expect(weight).toBe(5);
+      }
+    });
+
+    it("применяет глобальное снижение после 10 верных ответов", async () => {
+      const regReq = createMockReq({ login: "globaltest", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      const token = createSession("globaltest").token;
+
+      // Отправляем 10 верных ответов разными выражениями,
+      // чтобы adjustWeight не обнулил веса до глобального снижения
+      const expressions = [
+        "0+0", "0+1", "0+2", "0+3", "0+4",
+        "1+0", "1+1", "1+2", "1+3", "1+4",
+      ];
+      for (let i = 0; i < 10; i++) {
+        const submitReq = createMockReq(
+          { expression: expressions[i], correct: true, correctStreak: i + 1 },
+          { authorization: `Bearer ${token}` }
+        );
+        const submitMock = createMockRes();
+        await handleSubmitAnswer(submitReq, submitMock.res);
+        expect(submitMock._status).toBe(200);
+      }
+
+      // После 10 верных ответов все веса должны быть 4 (5 - 1 глобальное снижение)
+      // Каждое выражение уменьшилось на 1 из-за adjustWeight + на 1 из-за глобального = -2, но ограничено
+      // "0+0"..."1+4": adjustWeight 5→4, затем глобальное 4→3
+      const weights = readUserWeights("globaltest");
+      for (const expression of expressions) {
+        expect(weights.get(expression)).toBe(3);
+      }
+      // Неиспользованные выражения: только глобальное снижение 5→4
+      let untouchedCount = 0;
+      for (const [expr, weight] of weights) {
+        if (!expressions.includes(expr)) {
+          expect(weight).toBe(4);
+          untouchedCount++;
+        }
+      }
+      expect(untouchedCount).toBeGreaterThan(0);
+    });
+
+    it("не применяет глобальное снижение до 10 верных ответов", async () => {
+      const regReq = createMockReq({ login: "nostreak", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      const token = createSession("nostreak").token;
+
+      // Отправляем 5 верных ответов
+      for (let i = 0; i < 5; i++) {
+        const submitReq = createMockReq(
+          { expression: "1+2", correct: true, correctStreak: i + 1 },
+          { authorization: `Bearer ${token}` }
+        );
+        const submitMock = createMockRes();
+        await handleSubmitAnswer(submitReq, submitMock.res);
+        expect(submitMock._status).toBe(200);
+      }
+
+      // Веса должны остаться 5 (кроме "1+2" который уменьшился на 5 из-за adjustWeight)
+      const weights = readUserWeights("nostreak");
+      expect(weights.get("1+2")).toBe(0); // 5 - 5 = 0 (adjustWeight)
+      // Другие веса должны быть 5
+      let otherCount = 0;
+      for (const [expr, weight] of weights) {
+        if (expr !== "1+2") {
+          expect(weight).toBe(5);
+          otherCount++;
+        }
+      }
+      expect(otherCount).toBeGreaterThan(0);
+    });
+  });
+
+  describe("handleGetWeights", () => {
+    it("возвращает 401 без токена", async () => {
+      const req = createMockReq({});
+      const mock = createMockRes();
+      await handleGetWeights(req, mock.res);
+
+      expect(mock._status).toBe(401);
+    });
+
+    it("возвращает веса пользователя", async () => {
+      // Сначала регистрируем пользователя
+      const regReq = createMockReq({ login: "diana", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      const token = createSession("diana").token;
+
+      // Запрашиваем веса
+      const weightsReq = createMockReq({}, { authorization: `Bearer ${token}` });
+      const weightsMock = createMockRes();
+      await handleGetWeights(weightsReq, weightsMock.res);
+
+      expect(weightsMock._status).toBe(200);
+      const parsed = JSON.parse(weightsMock._data);
+      expect(parsed.weights).toBeDefined();
+      expect(Array.isArray(parsed.weights)).toBe(true);
+      expect(parsed.weights.length).toBeGreaterThan(0);
+
+      // Проверяем, что все веса равны 5 (по умолчанию)
+      for (const weightEntry of parsed.weights) {
+        expect(weightEntry.weight).toBe(5);
+      }
     });
   });
 });

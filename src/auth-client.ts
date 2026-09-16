@@ -145,6 +145,58 @@ export async function loadUsers(): Promise<string[]> {
   }
 }
 
+/** Загружает веса примеров для текущего пользователя. */
+export async function loadWeights(): Promise<
+  { expression: string; weight: number }[]
+> {
+  const token = getToken();
+  if (!token) return [];
+  try {
+    const res = await fetch(API_BASE + "/api/weights", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error((data as { error?: string }).error ?? "Ошибка сервера");
+    }
+    return data.weights ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Отправляет результат ответа на сервер для обновления весов. */
+export async function submitAnswer(
+  expression: string,
+  correct: boolean,
+  correctStreak: number
+): Promise<{ expression: string; weight: number }[]> {
+  const token = getToken();
+  if (!token) {
+    console.warn("Не авторизован — ответ не отправлен");
+    return [];
+  }
+  try {
+    const res = await fetch(API_BASE + "/api/submit-answer", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ expression, correct, correctStreak }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error((data as { error?: string }).error ?? "Ошибка сервера");
+    }
+    return data.newWeights ?? [];
+  } catch (err) {
+    console.error("Не удалось отправить ответ:", (err as Error).message);
+    return [];
+  }
+}
+
 /** Получает DOM-элементы экрана входа. */
 export function getLoginElements(): {
   loginScreen: HTMLElement;

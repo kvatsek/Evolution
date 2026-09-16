@@ -1,6 +1,15 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { generateSalt, hashPassword, verifyPassword } from "./crypto";
-import { addUser, findUserByLogin, readUsers, updateUser } from "./csv";
+import {
+  addUser,
+  createUserWeights,
+  findUserByLogin,
+  getAllExpressions,
+  readUserWeights,
+  readUsers,
+  updateUser,
+  writeUserWeights,
+} from "./csv";
 import { createSession, extractLoginByToken } from "./session";
 import { logLogin } from "../logger.js";
 import type {
@@ -8,6 +17,8 @@ import type {
   MeResponse,
   RegisterResponse,
   SaveScoreResponse,
+  SubmitAnswerResponse,
+  WeightEntry,
 } from "./types";
 
 /** Парсит JSON тело запроса. */
@@ -78,6 +89,10 @@ export async function handleRegister(
     lastLogin: "",
     totalScore: 0,
   });
+
+  // Создаём файл весов для нового пользователя
+  const examples = getAllExpressions();
+  createUserWeights(login, examples);
 
   const response: RegisterResponse = {
     user: {
@@ -223,4 +238,113 @@ export async function handleUsers(
   const users = readUsers();
   const logins = users.map((u) => u.login);
   sendJson(res, 200, { users: logins });
+}
+
+/**
+ * POST /api/submit-answer
+ * Обновляет веса примеров после ответа пользователя. Требует Bearer токен.
+ */
+export async function handleSubmitAnswer(
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  const token = extractBearerToken(req);
+  if (!token) {
+    sendJson(res, 401, { error: "Требуется авторизация" });
+    return;
+  }
+
+  const body = (await parseBody(req)) as {
+    expression?: string;
+    correct?: boolean;
+    correctStreak?: number;
+  };
+  const { expression, correct, correctStreak } = body;
+
+  if (typeof expression !== "string" || typeof correct !== "boolean") {
+    sendJson(res, 400, { error: "Укажите выражение и результат ответа" });
+    return;
+  }
+
+  const login = extractLoginByToken(token);
+  if (!login) {
+    sendJson(res, 401, { error: "Сессия истекла или токен недействителен" });
+    return;
+  }
+
+  // Читаем текущие веса
+  const weights = readUserWeights(login);
+
+  // Корректируем вес примера
+  adjustWeight(weights, expression, correct);
+
+  // Применяем глобальное снижение (correctStreak уже инкрементирован на клиенте)
+  const streak = typeof correctStreak === "number" ? correctStreak : 0;
+  applyGlobalReduction(weights, streak);
+
+  // Сохраняем обновлённые веса
+  writeUserWeights(login, weights);
+
+  // Формируем ответ
+  const newWeights: WeightEntry[] = Array.from(weights.entries()).map(
+    ([expression, weight]) => ({ expression, weight })
+  );
+
+  const response: SubmitAnswerResponse = { newWeights };
+  sendJson(res, 200, response);
+}
+
+/**
+ * GET /api/weights
+ * Возвращает веса примеров текущего пользователя. Требует Bearer токен.
+ */
+export async function handleGetWeights(
+  req: IncomingMessage,
+  res: ServerResponse
+): Promise<void> {
+  const token = extractBearerToken(req);
+  if (!token) {
+    sendJson(res, 401, { error: "Требуется авторизация" });
+    return;
+  }
+
+  const login = extractLoginByToken(token);
+  if (!login) {
+    sendJson(res, 401, { error: "Сессия истекла или токен недействителен" });
+    return;
+  }
+
+  const weights = readUserWeights(login);
+  const weightEntries: WeightEntry[] = Array.from(weights.entries()).map(
+    ([expression, weight]) => ({ expression, weight })
+  );
+
+  sendJson(res, 200, { weights: weightEntries });
+}
+
+/** Корректирует вес примера: верный ответ -1, неверный +2 (максимум 10). */
+function adjustWeight(
+  weights: Map<string, number>,
+  expression: string,
+  correct: boolean,
+): void {
+  const current = weights.get(expression) ?? 0;
+  const newWeight = correct ? current - 1 : Math.min(10, current + 2);
+  weights.set(expression, Math.max(0, newWeight));
+}
+
+/** Применяет глобальное снижение весов каждые N верных ответов.
+ * correctStreak уже инкрементирован на клиенте, поэтому инкремент здесь не нужен. */
+function applyGlobalReduction(
+  weights: Map<string, number>,
+  correctStreak: number,
+  reductionEvery: number = 10,
+): number {
+  if (correctStreak > 0 && correctStreak % reductionEvery === 0) {
+    for (const [expression, weight] of weights) {
+      const newWeight = Math.max(0, weight - 1);
+      weights.set(expression, newWeight);
+    }
+  }
+  return correctStreak % reductionEvery;
 }

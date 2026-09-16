@@ -2,7 +2,7 @@ import {
   formatGameEndMessage,
   formatProblem,
   hideError,
-  pickOperands,
+  pickWeightedProblem,
   processSubmit,
   showError,
   updateScore,
@@ -11,6 +11,7 @@ import {
   getLoginElements,
   hideLoginError,
   hideRegisterError,
+  loadWeights,
   login,
   me,
   populateUserSelect,
@@ -18,6 +19,7 @@ import {
   saveScore,
   showLoginError,
   showRegisterError,
+  submitAnswer,
 } from "./auth-client.js";
 
 const scoreEl = document.getElementById("score")!;
@@ -40,17 +42,32 @@ let score = 0;
 let a = 0;
 let b = 0;
 let isGameOver = false;
+let weights = new Map<string, number>();
+let expressions: string[] = [];
+let correctStreak = 0;
 
-/** Генерирует новый пример на сложение, сумма которого не превышает 10. */
-function generateProblem(): void {
-  const operands = pickOperands();
-  a = operands.a;
-  b = operands.b;
-  problemEl.textContent = formatProblem(a, b);
+/** Генерирует новый пример на сложение на основе весов. */
+async function generateProblem(): Promise<void> {
+  const result = pickWeightedProblem(expressions, weights);
+  if (result) {
+    a = result.a;
+    b = result.b;
+    problemEl.textContent = formatProblem(a, b);
+  }
+}
+
+/** Загружает веса примеров с сервера. */
+async function loadWeightsForGame(): Promise<void> {
+  const weightEntries = await loadWeights();
+  weights = new Map<string, number>();
+  for (const entry of weightEntries) {
+    weights.set(entry.expression, entry.weight);
+  }
+  expressions = Array.from(weights.keys());
 }
 
 /** Обрабатывает отправку формы: проверяет ответ и начисляет очки. */
-formEl.addEventListener("submit", (event) => {
+formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   hideError(errorEl);
 
@@ -63,14 +80,26 @@ formEl.addEventListener("submit", (event) => {
 
   if (outcome.kind === "correct") {
     score = outcome.score;
-    a = outcome.a;
-    b = outcome.b;
+    correctStreak++;
+
+    // Отправляем результат на сервер для обновления весов
+    const expression = `${a}+${b}`;
+    await submitAnswer(expression, true, correctStreak);
+
+    // Сбрасываем счётчик при достижении порога (каждые 10 верных ответов)
+    correctStreak = correctStreak % 10;
+
+    // Генерируем новый пример
+    await generateProblem();
     updateScore(scoreEl, score);
-    problemEl.textContent = formatProblem(a, b);
     inputEl.value = "";
     inputEl.focus();
     return;
   }
+
+  // Неверный ответ — отправляем на сервер
+  const expression = `${a}+${b}`;
+  await submitAnswer(expression, false, correctStreak);
 
   showError(errorEl, "Неверный ответ, попробуйте ещё раз");
   inputEl.select();
@@ -104,6 +133,7 @@ async function endGame(): Promise<void> {
 /** Перезапускает игру, сбрасывая счёт и возвращая игровой интерфейс. */
 function restartGame(): void {
   score = 0;
+  correctStreak = 0;
   isGameOver = false;
   updateScore(scoreEl, score);
   generateProblem();
@@ -141,7 +171,7 @@ window.addEventListener("beforeunload", () => {
 });
 
 /** Показывает экран игры и скрывает экраны входа и регистрации. */
-function showGame(): void {
+async function showGame(): Promise<void> {
   gameEl.hidden = false;
   loginScreen.hidden = true;
   registerScreen.hidden = true;
@@ -149,7 +179,8 @@ function showGame(): void {
   errorEl.hidden = true;
   gameEndEl.hidden = true;
   userLoginEl.textContent = localStorage.getItem("authLogin") ?? "";
-  generateProblem();
+  await loadWeightsForGame();
+  await generateProblem();
   updateScore(scoreEl, score);
   inputEl.focus();
 }
@@ -188,7 +219,7 @@ async function handleLoginSubmit(
   try {
     await login(loginName, password);
     localStorage.setItem("authLogin", loginName);
-    showGame();
+    await showGame();
   } catch (err) {
     showLoginError(errorEl, (err as Error).message);
   }
@@ -214,7 +245,7 @@ async function handleRegisterSubmit(
     // Автоматический вход после регистрации
     await login(loginName, password);
     localStorage.setItem("authLogin", loginName);
-    showGame();
+    await showGame();
   } catch (err) {
     showRegisterError(errorEl, (err as Error).message);
   }
@@ -245,7 +276,7 @@ async function checkAuth(): Promise<void> {
       const user = await me();
       if (user) {
         localStorage.setItem("authLogin", user.login);
-        showGame();
+        await showGame();
         return;
       }
     } catch {
