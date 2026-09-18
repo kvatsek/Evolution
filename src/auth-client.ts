@@ -87,12 +87,13 @@ export async function register(login: string, password: string): Promise<{
   login: string;
   totalScore: number;
   lastLogin: string;
+  level: number;
 }> {
   const data = await apiPost("/api/register", { login, password });
   const { user } = data as {
-    user: { login: string; totalScore: number; lastLogin: string };
+    user: { login: string; totalScore: number; lastLogin: string; level?: number };
   };
-  return user;
+  return { ...user, level: user.level ?? 1 };
 }
 
 /**
@@ -102,14 +103,14 @@ export async function register(login: string, password: string): Promise<{
 export async function login(
   login: string,
   password: string
-): Promise<{ login: string; totalScore: number; lastLogin: string }> {
+): Promise<{ login: string; totalScore: number; lastLogin: string; level: number }> {
   const data = await apiPost("/api/login", { login, password });
   const { token, user } = data as {
     token: string;
-    user: { login: string; totalScore: number; lastLogin: string };
+    user: { login: string; totalScore: number; lastLogin: string; level?: number };
   };
   setToken(token);
-  return user;
+  return { ...user, level: user.level ?? 1 };
 }
 
 /**
@@ -117,16 +118,16 @@ export async function login(
  * Возвращает null, если не авторизован.
  */
 export async function me(): Promise<
-  | { login: string; totalScore: number; lastLogin: string }
+  | { login: string; totalScore: number; lastLogin: string; level: number }
   | null
 > {
   const token = getToken();
   if (!token) return null;
   try {
     const data = await apiGet<{
-      user: { login: string; totalScore: number; lastLogin: string };
+      user: { login: string; totalScore: number; lastLogin: string; level?: number };
     }>("/api/me");
-    return data.user;
+    return { ...data.user, level: data.user.level ?? 1 };
   } catch {
     clearToken();
     return null;
@@ -166,16 +167,17 @@ export async function loadWeights(): Promise<
   }
 }
 
-/** Отправляет результат ответа на сервер для обновления весов. */
+/** Отправляет результат ответа на сервер для обновления весов.
+ * Возвращает массив весов и текущий уровень пользователя. */
 export async function submitAnswer(
   expression: string,
   correct: boolean,
   correctStreak: number
-): Promise<{ expression: string; weight: number }[]> {
+): Promise<{ weights: { expression: string; weight: number }[]; level?: number }> {
   const token = getToken();
   if (!token) {
     console.warn("Не авторизован — ответ не отправлен");
-    return [];
+    return { weights: [] };
   }
   try {
     const res = await fetch(API_BASE + "/api/submit-answer", {
@@ -190,10 +192,10 @@ export async function submitAnswer(
     if (!res.ok) {
       throw new Error((data as { error?: string }).error ?? "Ошибка сервера");
     }
-    return data.newWeights ?? [];
+    return { weights: data.newWeights ?? [], level: data.level };
   } catch (err) {
     console.error("Не удалось отправить ответ:", (err as Error).message);
-    return [];
+    return { weights: [] };
   }
 }
 

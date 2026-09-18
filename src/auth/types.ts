@@ -4,6 +4,7 @@ export interface User {
   passwordHash: string;
   lastLogin: string;
   totalScore: number;
+  level: number; // текущий уровень пользователя
 }
 
 /** Токен сессии. */
@@ -19,6 +20,7 @@ export interface RegisterResponse {
     login: string;
     totalScore: number;
     lastLogin: string;
+    level?: number;
   };
 }
 
@@ -29,6 +31,7 @@ export interface LoginResponse {
     login: string;
     totalScore: number;
     lastLogin: string;
+    level?: number;
   };
 }
 
@@ -43,6 +46,7 @@ export interface MeResponse {
     login: string;
     totalScore: number;
     lastLogin: string;
+    level?: number;
   };
 }
 
@@ -60,4 +64,5 @@ export interface WeightEntry {
 /** Ответ API на отправку ответа. */
 export interface SubmitAnswerResponse {
   newWeights: WeightEntry[];
+  level?: number; // текущий уровень пользователя (может измениться при переходе)
 }

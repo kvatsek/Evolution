@@ -31,7 +31,7 @@ function cleanCsv(): void {
 
 function initCsv(): void {
   ensureDataDir();
-  appendFileSync(TEST_CSV, "login,passwordHash,lastLogin,totalScore\n", "utf-8");
+  appendFileSync(TEST_CSV, "login,passwordHash,lastLogin,totalScore,level\n", "utf-8");
 }
 
 describe("crypto", () => {
@@ -102,13 +102,14 @@ describe("csv", () => {
     it("читает пользователей из CSV", () => {
       appendFileSync(
         TEST_CSV,
-        "ivan,s5al7:h4sh,2026-09-14T10:30:00.000Z,42\n",
+        "ivan,s5al7:h4sh,2026-09-14T10:30:00.000Z,42,1\n",
         "utf-8"
       );
       const users = readUsers();
       expect(users).toHaveLength(1);
       expect(users[0].login).toBe("ivan");
       expect(users[0].totalScore).toBe(42);
+      expect(users[0].level).toBe(1);
     });
   });
 
@@ -120,11 +121,12 @@ describe("csv", () => {
           passwordHash: "salt:hash",
           lastLogin: "2026-09-14T10:30:00.000Z",
           totalScore: 42,
+          level: 1,
         },
       ];
       writeUsers(users);
       const content = readFileSync(TEST_CSV, "utf-8");
-      expect(content).toContain("ivan,salt:hash,2026-09-14T10:30:00.000Z,42");
+      expect(content).toContain("ivan,salt:hash,2026-09-14T10:30:00.000Z,42,1");
     });
   });
 
@@ -137,7 +139,7 @@ describe("csv", () => {
     it("находит пользователя по логину", () => {
       appendFileSync(
         TEST_CSV,
-        "maria,x9mp2:k3sh1,2026-09-13T15:20:00.000Z,17\n",
+        "maria,x9mp2:k3sh1,2026-09-13T15:20:00.000Z,17,1\n",
         "utf-8"
       );
       const result = findUserByLogin("maria");
@@ -154,6 +156,7 @@ describe("csv", () => {
         passwordHash: "salt:hash",
         lastLogin: "",
         totalScore: 0,
+        level: 1,
       };
       addUser(user);
       const found = findUserByLogin("testuser");
@@ -166,7 +169,7 @@ describe("csv", () => {
     it("обновляет существующего пользователя", () => {
       appendFileSync(
         TEST_CSV,
-        "updateuser,oldhash,,0\n",
+        "updateuser,oldhash,,0,1\n",
         "utf-8"
       );
       updateUser("updateuser", {

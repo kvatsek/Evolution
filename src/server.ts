@@ -12,6 +12,7 @@ import {
   handleUsers,
   handleSubmitAnswer,
 } from "./auth/api.js";
+import { ensureUserLevelMigration } from "./auth/csv.js";
 
 /** Маршрутизирует API запросы к соответствующим обработчикам. */
 async function handleApiRequest(
@@ -99,6 +100,9 @@ export async function createApp(): Promise<{
 /** Запускает приложение. */
 export async function startServer(): Promise<void> {
   logStart();
+
+  // Миграция существующих пользователей
+  ensureUserLevelMigration();
 
   const { server, vite: viteServer } = await createApp();
 

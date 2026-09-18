@@ -13,7 +13,7 @@ import {
 import { createSession } from "./session";
 import { appendFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { readUserWeights } from "./csv";
+import { readUserCurrentWeights, readSolvedExamples } from "./csv";
 
 const TEST_CSV = join(process.cwd(), "data", "users.test.csv");
 
@@ -35,7 +35,7 @@ function cleanCsv(): void {
 
 function initCsv(): void {
   ensureDataDir();
-  appendFileSync(TEST_CSV, "login,passwordHash,lastLogin,totalScore\n", "utf-8");
+  appendFileSync(TEST_CSV, "login,passwordHash,lastLogin,totalScore,level\n", "utf-8");
 }
 
 /** Создаёт IncomingMessage с JSON телом. */
@@ -301,20 +301,20 @@ describe("api", () => {
       expect(weightEntry.weight).toBe(7);
     });
 
-    it("создаёт файл весов при регистрации", async () => {
+    it("создаёт папку пользователя с current.csv при регистрации", async () => {
       const regReq = createMockReq({ login: "charlie", password: "secret" });
       const regMock = createMockRes();
       await handleRegister(regReq, regMock.res);
 
       expect(regMock._status).toBe(201);
 
-      // Проверяем, что файл весов создан
-      const weights = readUserWeights("charlie");
-      expect(weights.size).toBeGreaterThan(0);
+      // Проверяем, что current.csv создан
+      const entries = readUserCurrentWeights("charlie");
+      expect(entries.length).toBeGreaterThan(0);
 
       // Все веса должны быть равны 5
-      for (const [, weight] of weights) {
-        expect(weight).toBe(5);
+      for (const entry of entries) {
+        expect(entry.weight).toBe(5);
       }
     });
 
@@ -341,18 +341,17 @@ describe("api", () => {
         expect(submitMock._status).toBe(200);
       }
 
-      // После 10 верных ответов все веса должны быть 4 (5 - 1 глобальное снижение)
-      // Каждое выражение уменьшилось на 1 из-за adjustWeight + на 1 из-за глобального = -2, но ограничено
-      // "0+0"..."1+4": adjustWeight 5→4, затем глобальное 4→3
-      const weights = readUserWeights("globaltest");
+      // После 10 верных ответов все веса должны быть 3 (5 - 1 adjustWeight - 1 глобальное)
+      const currentEntries = readUserCurrentWeights("globaltest");
+      const currentMap = new Map(currentEntries.map((e) => [e.expression, e.weight]));
       for (const expression of expressions) {
-        expect(weights.get(expression)).toBe(3);
+        expect(currentMap.get(expression)).toBe(3);
       }
       // Неиспользованные выражения: только глобальное снижение 5→4
       let untouchedCount = 0;
-      for (const [expr, weight] of weights) {
-        if (!expressions.includes(expr)) {
-          expect(weight).toBe(4);
+      for (const entry of currentEntries) {
+        if (!expressions.includes(entry.expression)) {
+          expect(entry.weight).toBe(4);
           untouchedCount++;
         }
       }
@@ -377,16 +376,15 @@ describe("api", () => {
         expect(submitMock._status).toBe(200);
       }
 
-      // Веса должны остаться 5 (кроме "1+2" который уменьшился на 5 из-за adjustWeight)
-      const weights = readUserWeights("nostreak");
-      expect(weights.get("1+2")).toBe(0); // 5 - 5 = 0 (adjustWeight)
+      // "1+2" должен быть перенесён в solved и удалён из current (вес достиг 0)
+      const currentEntries = readUserCurrentWeights("nostreak");
+      expect(currentEntries.some((e) => e.expression === "1+2")).toBe(false);
+
       // Другие веса должны быть 5
       let otherCount = 0;
-      for (const [expr, weight] of weights) {
-        if (expr !== "1+2") {
-          expect(weight).toBe(5);
-          otherCount++;
-        }
+      for (const entry of currentEntries) {
+        expect(entry.weight).toBe(5);
+        otherCount++;
       }
       expect(otherCount).toBeGreaterThan(0);
     });
@@ -424,6 +422,61 @@ describe("api", () => {
       for (const weightEntry of parsed.weights) {
         expect(weightEntry.weight).toBe(5);
       }
+    });
+  });
+
+  describe("handleRegister with levels", () => {
+    it("создаёт папку пользователя с current.csv и solved.csv", async () => {
+      const regReq = createMockReq({ login: "leveluser", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      expect(regMock._status).toBe(201);
+
+      // Проверяем, что current.csv создан
+      const currentEntries = readUserCurrentWeights("leveluser");
+      expect(currentEntries.length).toBeGreaterThan(0);
+
+      // Все примеры должны быть уровня 1
+      for (const entry of currentEntries) {
+        expect(entry.level).toBe(1);
+        expect(entry.weight).toBe(5);
+      }
+
+      // Проверяем, что solved.csv создан
+      const solved = readSolvedExamples("leveluser");
+      expect(solved).toEqual([]);
+    });
+  });
+
+  describe("handleSubmitAnswer with weight=0", () => {
+    it("переносит пример в solved.csv при весе 0", async () => {
+      // Сначала регистрируем пользователя
+      const regReq = createMockReq({ login: "zeroweight", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      const token = createSession("zeroweight").token;
+
+      // Отправляем много верных ответов, чтобы обнулить вес
+      // Вес начинается с 5, каждый верный ответ -1
+      for (let i = 0; i < 5; i++) {
+        const submitReq = createMockReq(
+          { expression: "2+3", correct: true, correctStreak: i + 1 },
+          { authorization: `Bearer ${token}` }
+        );
+        const submitMock = createMockRes();
+        await handleSubmitAnswer(submitReq, submitMock.res);
+        expect(submitMock._status).toBe(200);
+      }
+
+      // Проверяем, что пример перенесён в solved
+      const solved = readSolvedExamples("zeroweight");
+      expect(solved.some((e) => e.expression === "2+3")).toBe(true);
+
+      // Проверяем, что пример удалён из current
+      const currentAfter = readUserCurrentWeights("zeroweight");
+      expect(currentAfter.some((e) => e.expression === "2+3")).toBe(false);
     });
   });
 });

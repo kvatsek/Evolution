@@ -23,6 +23,7 @@ import {
 } from "./auth-client.js";
 
 const scoreEl = document.getElementById("score")!;
+const levelEl = document.getElementById("level")!;
 const problemEl = document.getElementById("problem")!;
 const formEl = document.getElementById("answer-form") as HTMLFormElement;
 const inputEl = document.getElementById("answer-input") as HTMLInputElement;
@@ -41,18 +42,25 @@ const registerScreen = document.getElementById("register-screen")!;
 let score = 0;
 let a = 0;
 let b = 0;
+let currentOperator: "+" | "-" = "+";
+let currentExpression = "";
 let isGameOver = false;
 let weights = new Map<string, number>();
 let expressions: string[] = [];
 let correctStreak = 0;
+let currentLevel = 1;
 
 /** Генерирует новый пример на сложение на основе весов. */
 async function generateProblem(): Promise<void> {
+  // Обновляем expressions — только примеры, которые есть в weights
+  expressions = Array.from(weights.keys());
   const result = pickWeightedProblem(expressions, weights);
   if (result) {
     a = result.a;
     b = result.b;
-    problemEl.textContent = formatProblem(a, b);
+    currentOperator = result.operator;
+    currentExpression = result.expression;
+    problemEl.textContent = formatProblem(a, b, currentOperator);
   }
 }
 
@@ -60,8 +68,12 @@ async function generateProblem(): Promise<void> {
 async function loadWeightsForGame(): Promise<void> {
   const weightEntries = await loadWeights();
   weights = new Map<string, number>();
+  expressions = [];
   for (const entry of weightEntries) {
-    weights.set(entry.expression, entry.weight);
+    // Фильтруем только примеры с весом > 0
+    if (entry.weight > 0) {
+      weights.set(entry.expression, entry.weight);
+    }
   }
   expressions = Array.from(weights.keys());
 }
@@ -71,7 +83,7 @@ formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   hideError(errorEl);
 
-  const outcome = processSubmit(inputEl.value, a, b, score);
+  const outcome = processSubmit(inputEl.value, a, b, score, currentOperator);
 
   if (outcome.kind === "invalid") {
     showError(errorEl, "Введите число");
@@ -83,8 +95,24 @@ formEl.addEventListener("submit", async (event) => {
     correctStreak++;
 
     // Отправляем результат на сервер для обновления весов
-    const expression = `${a}+${b}`;
-    await submitAnswer(expression, true, correctStreak);
+    const result = await submitAnswer(currentExpression, true, correctStreak);
+
+    // Обновляем веса из ответа сервера
+    if (result.weights) {
+      weights = new Map<string, number>();
+      for (const w of result.weights) {
+        if (w.weight > 0) {
+          weights.set(w.expression, w.weight);
+        }
+      }
+    }
+
+    // Обновляем уровень, если сервер вернул новый
+    if (result.level !== undefined) {
+      currentLevel = result.level;
+      localStorage.setItem("authLevel", String(currentLevel));
+      levelEl.textContent = `Уровень: ${currentLevel}`;
+    }
 
     // Сбрасываем счётчик при достижении порога (каждые 10 верных ответов)
     correctStreak = correctStreak % 10;
@@ -97,9 +125,16 @@ formEl.addEventListener("submit", async (event) => {
     return;
   }
 
-  // Неверный ответ — отправляем на сервер
-  const expression = `${a}+${b}`;
-  await submitAnswer(expression, false, correctStreak);
+  // Неверный ответ — отправляем на сервер и обновляем веса
+  const wrongResult = await submitAnswer(currentExpression, false, correctStreak);
+  if (wrongResult.weights) {
+    weights = new Map<string, number>();
+    for (const w of wrongResult.weights) {
+      if (w.weight > 0) {
+        weights.set(w.expression, w.weight);
+      }
+    }
+  }
 
   showError(errorEl, "Неверный ответ, попробуйте ещё раз");
   inputEl.select();
@@ -179,6 +214,8 @@ async function showGame(): Promise<void> {
   errorEl.hidden = true;
   gameEndEl.hidden = true;
   userLoginEl.textContent = localStorage.getItem("authLogin") ?? "";
+  currentLevel = parseInt(localStorage.getItem("authLevel") || "1", 10);
+  levelEl.textContent = `Уровень: ${currentLevel}`;
   await loadWeightsForGame();
   await generateProblem();
   updateScore(scoreEl, score);
@@ -217,8 +254,10 @@ async function handleLoginSubmit(
   }
 
   try {
-    await login(loginName, password);
+    const user = await login(loginName, password);
     localStorage.setItem("authLogin", loginName);
+    localStorage.setItem("authLevel", String(user.level));
+    currentLevel = user.level;
     await showGame();
   } catch (err) {
     showLoginError(errorEl, (err as Error).message);
@@ -243,8 +282,10 @@ async function handleRegisterSubmit(
   try {
     await register(loginName, password);
     // Автоматический вход после регистрации
-    await login(loginName, password);
+    const user = await login(loginName, password);
     localStorage.setItem("authLogin", loginName);
+    localStorage.setItem("authLevel", String(user.level));
+    currentLevel = user.level;
     await showGame();
   } catch (err) {
     showRegisterError(errorEl, (err as Error).message);
@@ -276,6 +317,8 @@ async function checkAuth(): Promise<void> {
       const user = await me();
       if (user) {
         localStorage.setItem("authLogin", user.login);
+        localStorage.setItem("authLevel", String(user.level));
+        currentLevel = user.level;
         await showGame();
         return;
       }

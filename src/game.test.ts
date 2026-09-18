@@ -99,22 +99,48 @@ describe("updateScore", () => {
 
 describe("processSubmit", () => {
   it("возвращает invalid для нечислового ввода", () => {
-    expect(processSubmit("abc", 2, 3, 0)).toEqual({ kind: "invalid" });
+    expect(processSubmit("abc", 2, 3, 0, "+")).toEqual({ kind: "invalid" });
   });
 
   it("возвращает wrong для неверного ответа", () => {
-    expect(processSubmit("4", 2, 3, 2)).toEqual({ kind: "wrong" });
+    expect(processSubmit("4", 2, 3, 2, "+")).toEqual({ kind: "wrong" });
+  });
+
+  it("проверяет правильный ответ для сложения", () => {
+    const result = processSubmit("5", 2, 3, 0, "+");
+    expect(result.kind).toBe("correct");
+    if (result.kind === "correct") {
+      expect(result.score).toBe(1);
+      expect(result.operator).toBe("+");
+      expect(result.a).toBeTypeOf("number");
+      expect(result.b).toBeTypeOf("number");
+    }
+  });
+
+  it("проверяет правильный ответ для вычитания", () => {
+    const result = processSubmit("2", 5, 3, 0, "-");
+    expect(result.kind).toBe("correct");
+    if (result.kind === "correct") {
+      expect(result.score).toBe(1);
+      expect(result.operator).toBe("+");
+      expect(result.a).toBeTypeOf("number");
+      expect(result.b).toBeTypeOf("number");
+    }
+  });
+
+  it("возвращает wrong для неверного ответа при вычитании", () => {
+    expect(processSubmit("8", 5, 3, 0, "-")).toEqual({ kind: "wrong" });
   });
 
   it("возвращает correct и увеличивает счёт", () => {
     const random = vi.fn().mockReturnValue(0);
 
-    expect(processSubmit("5", 2, 3, 2, random)).toEqual({
-      kind: "correct",
-      score: 3,
-      a: 0,
-      b: 0,
-    });
+    const result = processSubmit("5", 2, 3, 2, "+", random);
+    expect(result.kind).toBe("correct");
+    if (result.kind === "correct") {
+      expect(result.score).toBe(3);
+      expect(result.operator).toBe("+");
+    }
   });
 });
 
@@ -282,5 +308,32 @@ describe("applyGlobalReduction", () => {
     const result = applyGlobalReduction(weights, 9);
     expect(result).toBe(0);
     expect(weights.get("1+2")).toBe(4);
+  });
+});
+
+describe("parseExpression", () => {
+  it("парсит сложение", () => {
+    const result = parseExpression("3+5");
+    expect(result).toEqual({ a: 3, b: 5 });
+  });
+
+  it("парсит вычитание", () => {
+    const result = parseExpression("10-3");
+    expect(result).toEqual({ a: 10, b: 3 });
+  });
+
+  it("парсит числа с нулём", () => {
+    expect(parseExpression("0+0")).toEqual({ a: 0, b: 0 });
+    expect(parseExpression("0-0")).toEqual({ a: 0, b: 0 });
+  });
+
+  it("парсит двузначные числа", () => {
+    expect(parseExpression("10+10")).toEqual({ a: 10, b: 10 });
+    expect(parseExpression("20-5")).toEqual({ a: 20, b: 5 });
+  });
+
+  it("возвращает { a: 0, b: 0 } для некорректной строки", () => {
+    expect(parseExpression("invalid")).toEqual({ a: 0, b: 0 });
+    expect(parseExpression("")).toEqual({ a: 0, b: 0 });
   });
 });
