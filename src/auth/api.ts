@@ -425,17 +425,17 @@ function adjustWeightEntries(
   entry.weight = Math.max(0, newWeight);
 }
 
-/** Применяет глобальное снижение весов каждые N верных ответов.
- * correctStreak уже инкрементирован на клиенте, поэтому инкремент здесь не нужен. */
+/** Применяет глобальное снижение весов каждые N верных ответов подряд.
+ * correctStreak уже инкрементирован на клиенте и означает количество верных ответов БЕЗ ОШИБОК.
+ * Снижение применяется только если streak кратен reductionEvery. */
 function applyGlobalReductionEntries(
   entries: import("./csv").CurrentEntry[],
   correctStreak: number,
   reductionEvery: number = 10,
-): number {
+): void {
   if (correctStreak > 0 && correctStreak % reductionEvery === 0) {
     for (const entry of entries) {
       entry.weight = Math.max(0, entry.weight - 1);
     }
   }
-  return correctStreak % reductionEvery;
 }

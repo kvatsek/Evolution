@@ -388,6 +388,60 @@ describe("api", () => {
       }
       expect(otherCount).toBeGreaterThan(0);
     });
+
+    it("сбрасывает streak при ошибке — не применяет глобальное снижение", async () => {
+      const regReq = createMockReq({ login: "errorstreak", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      const token = createSession("errorstreak").token;
+
+      // 9 верных ответов подряд
+      for (let i = 0; i < 9; i++) {
+        const submitReq = createMockReq(
+          { expression: "0+0", correct: true, correctStreak: i + 1 },
+          { authorization: `Bearer ${token}` }
+        );
+        const submitMock = createMockRes();
+        await handleSubmitAnswer(submitReq, submitMock.res);
+        expect(submitMock._status).toBe(200);
+      }
+
+      // ОШИБКА — streak сбрасывается на 0
+      const errorReq = createMockReq(
+        { expression: "0+0", correct: false, correctStreak: 0 },
+        { authorization: `Bearer ${token}` }
+      );
+      const errorMock = createMockRes();
+      await handleSubmitAnswer(errorReq, errorMock.res);
+      expect(errorMock._status).toBe(200);
+
+      // 9 верных ответов подряд (после ошибки)
+      for (let i = 0; i < 9; i++) {
+        const submitReq = createMockReq(
+          { expression: "0+1", correct: true, correctStreak: i + 1 },
+          { authorization: `Bearer ${token}` }
+        );
+        const submitMock = createMockRes();
+        await handleSubmitAnswer(submitReq, submitMock.res);
+        expect(submitMock._status).toBe(200);
+      }
+
+      // Итого streak = 9 (не 18), глобальное снижение НЕ должно применяться
+      const currentEntries = readUserCurrentWeights("errorstreak");
+      const currentMap = new Map(currentEntries.map((e) => [e.expression, e.weight]));
+
+      // Главное: streak не достиг 10, значит глобального снижения не было
+      // Неиспользованные выражения должны остаться на уровне 5 (без глобального снижения)
+      let untouchedCount = 0;
+      for (const entry of currentEntries) {
+        if (entry.expression !== "0+0" && entry.expression !== "0+1") {
+          expect(entry.weight).toBe(5);
+          untouchedCount++;
+        }
+      }
+      expect(untouchedCount).toBeGreaterThan(0);
+    });
   });
 
   describe("handleGetWeights", () => {

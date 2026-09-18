@@ -268,26 +268,35 @@ describe("adjustWeight", () => {
 });
 
 describe("applyGlobalReduction", () => {
-  it("снижает все веса на 1 при достижении порога 10", () => {
+  it("снижает все веса на 1 при streak = 10 (10 верных подряд)", () => {
     const weights = new Map<string, number>();
     weights.set("1+2", 5);
     weights.set("3+4", 7);
     weights.set("5+5", 3);
 
-    const result = applyGlobalReduction(weights, 9);
-    expect(result).toBe(0); // Сброс счётчика
+    const result = applyGlobalReduction(weights, 10);
+    expect(result).toBe(true); // Снижение применено
     expect(weights.get("1+2")).toBe(4);
     expect(weights.get("3+4")).toBe(6);
     expect(weights.get("5+5")).toBe(2);
   });
 
-  it("инкрементирует счётчик при пороге не достигнут", () => {
+  it("не снижает веса при streak < 10", () => {
+    const weights = new Map<string, number>();
+    weights.set("1+2", 5);
+
+    const result = applyGlobalReduction(weights, 5);
+    expect(result).toBe(false); // Снижение не применено
+    expect(weights.get("1+2")).toBe(5); // Вес не изменился
+  });
+
+  it("не снижает веса при streak = 0", () => {
     const weights = new Map<string, number>();
     weights.set("1+2", 5);
 
     const result = applyGlobalReduction(weights, 0);
-    expect(result).toBe(1);
-    expect(weights.get("1+2")).toBe(5); // Вес не изменился
+    expect(result).toBe(false);
+    expect(weights.get("1+2")).toBe(5);
   });
 
   it("не опускает веса ниже 0 при глобальном снижении", () => {
@@ -295,19 +304,30 @@ describe("applyGlobalReduction", () => {
     weights.set("1+2", 0);
     weights.set("3+4", 5);
 
-    const result = applyGlobalReduction(weights, 9);
-    expect(result).toBe(0);
+    const result = applyGlobalReduction(weights, 10);
+    expect(result).toBe(true);
     expect(weights.get("1+2")).toBe(0); // Не ниже 0
     expect(weights.get("3+4")).toBe(4);
   });
 
-  it("работает с порогом по умолчанию 10", () => {
+  it("снижает веса при streak = 20 (два цикла по 10)", () => {
+    const weights = new Map<string, number>();
+    weights.set("1+2", 5);
+    weights.set("3+4", 3);
+
+    const result = applyGlobalReduction(weights, 20);
+    expect(result).toBe(true);
+    expect(weights.get("1+2")).toBe(4);
+    expect(weights.get("3+4")).toBe(2);
+  });
+
+  it("не снижает при streak = 15 (не кратно 10)", () => {
     const weights = new Map<string, number>();
     weights.set("1+2", 5);
 
-    const result = applyGlobalReduction(weights, 9);
-    expect(result).toBe(0);
-    expect(weights.get("1+2")).toBe(4);
+    const result = applyGlobalReduction(weights, 15);
+    expect(result).toBe(false);
+    expect(weights.get("1+2")).toBe(5);
   });
 });
 

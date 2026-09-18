@@ -136,21 +136,21 @@ export function adjustWeight(
   weights.set(expression, Math.max(0, newWeight));
 }
 
-/** Применяет глобальное снижение весов каждые N верных ответов. */
+/** Применяет глобальное снижение весов каждые N верных ответов подряд.
+ * correctStreak — текущее количество верных ответов подряд (уже инкрементирован).
+ * Если streak кратен reductionEvery — снижаем все веса на 1. */
 export function applyGlobalReduction(
   weights: Map<string, number>,
-  correctCount: number,
+  correctStreak: number,
   reductionEvery: number = 10,
-): number {
-  const newCount = correctCount + 1;
-
-  // Если достигли порога — снижаем все веса и сбрасываем счётчик
-  if (newCount >= reductionEvery) {
+): boolean {
+  // Глобальное снижение только если streak кратен reductionEvery (значит N подряд без ошибок)
+  if (correctStreak > 0 && correctStreak % reductionEvery === 0) {
     for (const [expression, weight] of weights) {
       const newWeight = Math.max(0, weight - 1);
       weights.set(expression, newWeight);
     }
-    return 0; // Сбрасываем счётчик
+    return true; // Снижение применено
   }
-  return newCount;
+  return false; // Снижение не применено
 }

@@ -114,8 +114,7 @@ formEl.addEventListener("submit", async (event) => {
       levelEl.textContent = `Уровень: ${currentLevel}`;
     }
 
-    // Сбрасываем счётчик при достижении порога (каждые 10 верных ответов)
-    correctStreak = correctStreak % 10;
+    // Счётчик верных ответов подряд сохраняется (сбрасывается при ошибке)
 
     // Генерируем новый пример
     await generateProblem();
@@ -125,7 +124,8 @@ formEl.addEventListener("submit", async (event) => {
     return;
   }
 
-  // Неверный ответ — отправляем на сервер и обновляем веса
+  // Неверный ответ — сбрасываем streak и отправляем на сервер
+  correctStreak = 0;
   const wrongResult = await submitAnswer(currentExpression, false, correctStreak);
   if (wrongResult.weights) {
     weights = new Map<string, number>();
