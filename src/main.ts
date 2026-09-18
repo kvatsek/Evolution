@@ -30,6 +30,9 @@ const inputEl = document.getElementById("answer-input") as HTMLInputElement;
 const errorEl = document.getElementById("error")!;
 const gameEl = document.getElementById("game")!;
 const gameEndEl = document.getElementById("game-end")!;
+const levelUpEl = document.getElementById("level-up")!;
+const levelUpTextEl = document.getElementById("level-up-text")!;
+const levelUpButton = document.getElementById("level-up-button") as HTMLButtonElement;
 const finalScoreEl = document.getElementById("final-score")!;
 const saveErrorEl = document.getElementById("save-error") as HTMLElement | null;
 const userLoginEl = document.getElementById("user-login")!;
@@ -45,6 +48,7 @@ let b = 0;
 let currentOperator: "+" | "-" = "+";
 let currentExpression = "";
 let isGameOver = false;
+let isLevelUp = false;
 let weights = new Map<string, number>();
 let expressions: string[] = [];
 let correctStreak = 0;
@@ -81,6 +85,7 @@ async function loadWeightsForGame(): Promise<void> {
 /** Обрабатывает отправку формы: проверяет ответ и начисляет очки. */
 formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (isLevelUp) return;
   hideError(errorEl);
 
   const outcome = processSubmit(inputEl.value, a, b, score, currentOperator);
@@ -108,10 +113,13 @@ formEl.addEventListener("submit", async (event) => {
     }
 
     // Обновляем уровень, если сервер вернул новый
-    if (result.level !== undefined) {
+    if (result.level !== undefined && result.level > currentLevel) {
+      // Переход на новый уровень — показываем экран level-up
       currentLevel = result.level;
       localStorage.setItem("authLevel", String(currentLevel));
       levelEl.textContent = `Уровень: ${currentLevel}`;
+      showLevelUp();
+      return;
     }
 
     // Счётчик верных ответов подряд сохраняется (сбрасывается при ошибке)
@@ -162,6 +170,7 @@ async function endGame(): Promise<void> {
   gameEl.hidden = true;
   formEl.hidden = true;
   errorEl.hidden = true;
+  levelUpEl.hidden = true;
   gameEndEl.hidden = false;
 }
 
@@ -179,8 +188,28 @@ function restartGame(): void {
   inputEl.focus();
 }
 
+/** Показывает экран перехода на новый уровень. */
+function showLevelUp(): void {
+  isLevelUp = true;
+  gameEl.hidden = true;
+  formEl.hidden = true;
+  levelUpTextEl.textContent = `Уровень ${currentLevel}!`;
+  levelUpEl.hidden = false;
+}
+
+/** Возобновляет игру после показа экрана level-up. */
+function resumeGame(): void {
+  isLevelUp = false;
+  levelUpEl.hidden = true;
+  gameEl.hidden = false;
+  formEl.hidden = false;
+  generateProblem();
+  inputEl.focus();
+}
+
 restartButton.addEventListener("click", restartGame);
 finishButton.addEventListener("click", endGame);
+levelUpButton.addEventListener("click", resumeGame);
 
 /** Переключает на экран входа, очищая данные текущей сессии. */
 switchUserButton.addEventListener("click", () => {
@@ -210,6 +239,7 @@ async function showGame(): Promise<void> {
   gameEl.hidden = false;
   loginScreen.hidden = true;
   registerScreen.hidden = true;
+  levelUpEl.hidden = true;
   formEl.hidden = false;
   errorEl.hidden = true;
   gameEndEl.hidden = true;

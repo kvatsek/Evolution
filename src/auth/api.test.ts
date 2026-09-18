@@ -429,7 +429,6 @@ describe("api", () => {
 
       // Итого streak = 9 (не 18), глобальное снижение НЕ должно применяться
       const currentEntries = readUserCurrentWeights("errorstreak");
-      const currentMap = new Map(currentEntries.map((e) => [e.expression, e.weight]));
 
       // Главное: streak не достиг 10, значит глобального снижения не было
       // Неиспользованные выражения должны остаться на уровне 5 (без глобального снижения)
