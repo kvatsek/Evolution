@@ -64,6 +64,26 @@ describe("auth-client", () => {
 
       expect(onError).toHaveBeenCalled();
     });
+
+    it("отправляет correctAnswers вместе со счётом", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ totalScore: 42 }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
+      localStorage.setItem("authToken", "test-token");
+
+      await saveScore(10, undefined, 25);
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/save-score", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer test-token",
+        },
+        body: JSON.stringify({ score: 10, correctAnswers: 25 }),
+      });
+    });
   });
 
   describe("register", () => {

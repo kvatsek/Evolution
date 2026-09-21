@@ -254,7 +254,7 @@ describe("user level files", () => {
       // Создаём пользователя с level=4
       appendFileSync(
         join(process.cwd(), "data", "users.test.csv"),
-        "maxleveluser,salt:hash,,0,4\n",
+        "maxleveluser,salt:hash,,0,4,{}\n",
         "utf-8"
       );
 
@@ -268,7 +268,7 @@ describe("user level files", () => {
     it("возвращает null если нет примера с весом 0", () => {
       appendFileSync(
         join(process.cwd(), "data", "users.test.csv"),
-        "nozeroweightuser,salt:hash,,0,1\n",
+        "nozeroweightuser,salt:hash,,0,1,{}\n",
         "utf-8"
       );
 
@@ -286,7 +286,7 @@ describe("user level files", () => {
       // Создаём пользователя с level=1
       appendFileSync(
         join(process.cwd(), "data", "users.test.csv"),
-        "advanceuser,salt:hash,,0,1\n",
+        "advanceuser,salt:hash,,0,1,{}\n",
         "utf-8"
       );
 

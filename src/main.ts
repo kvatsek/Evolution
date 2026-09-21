@@ -21,6 +21,10 @@ import {
   showRegisterError,
   submitAnswer,
 } from "./auth-client.js";
+import {
+  addCorrectAnswer,
+  updateWorldTimeDisplay,
+} from "./world-time.js";
 
 const scoreEl = document.getElementById("score")!;
 const levelEl = document.getElementById("level")!;
@@ -53,6 +57,7 @@ let weights = new Map<string, number>();
 let expressions: string[] = [];
 let correctStreak = 0;
 let currentLevel = 1;
+let worldTimeState = { correctAnswers: 0, totalHours: 0 };
 
 /** Генерирует новый пример на сложение на основе весов. */
 async function generateProblem(): Promise<void> {
@@ -99,8 +104,12 @@ formEl.addEventListener("submit", async (event) => {
     score = outcome.score;
     correctStreak++;
 
+    // Обновляем время мира
+    addCorrectAnswer(worldTimeState);
+    updateWorldTimeDisplay(worldTimeState.totalHours);
+
     // Отправляем результат на сервер для обновления весов
-    const result = await submitAnswer(currentExpression, true, correctStreak);
+    const result = await submitAnswer(currentExpression, true, correctStreak, worldTimeState.correctAnswers);
 
     // Обновляем веса из ответа сервера
     if (result.weights) {
@@ -153,14 +162,14 @@ async function endGame(): Promise<void> {
   if (isGameOver) return;
   isGameOver = true;
 
-  // Сохраняем счёт на сервере
+  // Сохраняем счёт и время мира на сервере
   try {
     await saveScore(score, (msg) => {
       if (saveErrorEl) {
         saveErrorEl.textContent = msg;
         saveErrorEl.hidden = false;
       }
-    });
+    }, worldTimeState.correctAnswers);
   } catch {
     // Ошибка уже обработана в saveScore через onError
   }
@@ -212,9 +221,18 @@ finishButton.addEventListener("click", endGame);
 levelUpButton.addEventListener("click", resumeGame);
 
 /** Переключает на экран входа, очищая данные текущей сессии. */
-switchUserButton.addEventListener("click", () => {
+switchUserButton.addEventListener("click", async () => {
+  // Сохраняем время мира перед сменой пользователя
+  if (worldTimeState.correctAnswers > 0) {
+    try {
+      await saveScore(0, undefined, worldTimeState.correctAnswers);
+    } catch {
+      // Игнорируем ошибки сохранения при смене пользователя
+    }
+  }
   score = 0;
   isGameOver = false;
+  worldTimeState = { correctAnswers: 0, totalHours: 0 };
   localStorage.removeItem("authToken");
   localStorage.removeItem("authLogin");
   showLogin();
@@ -246,6 +264,7 @@ async function showGame(): Promise<void> {
   userLoginEl.textContent = localStorage.getItem("authLogin") ?? "";
   currentLevel = parseInt(localStorage.getItem("authLevel") || "1", 10);
   levelEl.textContent = `Уровень: ${currentLevel}`;
+
   await loadWeightsForGame();
   await generateProblem();
   updateScore(scoreEl, score);
@@ -288,6 +307,8 @@ async function handleLoginSubmit(
     localStorage.setItem("authLogin", loginName);
     localStorage.setItem("authLevel", String(user.level));
     currentLevel = user.level;
+    worldTimeState = user.worldTime ?? { correctAnswers: 0, totalHours: 0 };
+    updateWorldTimeDisplay(worldTimeState.totalHours);
     await showGame();
   } catch (err) {
     showLoginError(errorEl, (err as Error).message);
@@ -316,6 +337,8 @@ async function handleRegisterSubmit(
     localStorage.setItem("authLogin", loginName);
     localStorage.setItem("authLevel", String(user.level));
     currentLevel = user.level;
+    worldTimeState = user.worldTime ?? { correctAnswers: 0, totalHours: 0 };
+    updateWorldTimeDisplay(worldTimeState.totalHours);
     await showGame();
   } catch (err) {
     showRegisterError(errorEl, (err as Error).message);
@@ -349,6 +372,8 @@ async function checkAuth(): Promise<void> {
         localStorage.setItem("authLogin", user.login);
         localStorage.setItem("authLevel", String(user.level));
         currentLevel = user.level;
+        worldTimeState = user.worldTime ?? { correctAnswers: 0, totalHours: 0 };
+        updateWorldTimeDisplay(worldTimeState.totalHours);
         await showGame();
         return;
       }

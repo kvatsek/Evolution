@@ -1,3 +1,9 @@
+/** Состояние времени мира для пользователя. */
+export interface WorldTime {
+  correctAnswers: number;
+  totalHours: number;
+}
+
 /** Информация о пользователе из CSV. */
 export interface User {
   login: string;
@@ -5,6 +11,7 @@ export interface User {
   lastLogin: string;
   totalScore: number;
   level: number; // текущий уровень пользователя
+  worldTime: WorldTime; // время жизни мира пользователя
 }
 
 /** Токен сессии. */
@@ -21,6 +28,7 @@ export interface RegisterResponse {
     totalScore: number;
     lastLogin: string;
     level?: number;
+    worldTime?: WorldTime;
   };
 }
 
@@ -32,6 +40,7 @@ export interface LoginResponse {
     totalScore: number;
     lastLogin: string;
     level?: number;
+    worldTime?: WorldTime;
   };
 }
 
@@ -47,6 +56,7 @@ export interface MeResponse {
     totalScore: number;
     lastLogin: string;
     level?: number;
+    worldTime?: WorldTime;
   };
 }
 

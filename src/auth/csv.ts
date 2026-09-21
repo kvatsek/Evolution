@@ -1,6 +1,6 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { User } from "./types";
+import type { User, WorldTime } from "./types";
 
 /** Запись веса примера с уровнем. */
 export interface CurrentEntry {
@@ -16,7 +16,7 @@ export interface SolvedEntry {
 }
 
 const DATA_DIR = join(process.cwd(), "data");
-const HEADER = "login,passwordHash,lastLogin,totalScore,level";
+const HEADER = "login,passwordHash,lastLogin,totalScore,level,worldTime";
 
 /** Гарантирует, что директория существует. */
 function ensureDir(dir: string): void {
@@ -48,14 +48,35 @@ export function readUsers(): User[] {
     .filter((line) => line.length > 0 && line !== HEADER);
 
   return lines.map((line) => {
-    const parts = line.split(",");
-    const [login, passwordHash, lastLogin, totalScoreStr, levelStr] = parts;
+    // worldTime — JSON строка с запятыми, парсим первые 5 полей, остальное — worldTime
+    let idx = 0;
+    const fields: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const commaIdx = line.indexOf(",", idx);
+      fields.push(line.substring(idx, commaIdx));
+      idx = commaIdx + 1;
+    }
+    const [login, passwordHash, lastLogin, totalScoreStr, levelStr] = fields;
+    const worldTimeStr = line.substring(idx);
+
+    let worldTime: WorldTime = { correctAnswers: 0, totalHours: 0 };
+    if (worldTimeStr) {
+      try {
+        const parsed = JSON.parse(worldTimeStr);
+        if (parsed && typeof parsed === "object" && "correctAnswers" in parsed) {
+          worldTime = parsed as WorldTime;
+        }
+      } catch {
+        // Если ошибка парсинга, используем значение по умолчанию
+      }
+    }
     return {
       login: login ?? "",
       passwordHash: passwordHash ?? "",
       lastLogin: lastLogin ?? "",
       totalScore: Number(totalScoreStr) || 0,
       level: Number(levelStr) || 1,
+      worldTime,
     };
   });
 }
@@ -66,7 +87,8 @@ export function writeUsers(users: User[]): void {
   const csvPath = getUsersCsvPath();
   const lines = [HEADER];
   for (const user of users) {
-    lines.push(`${user.login},${user.passwordHash},${user.lastLogin},${user.totalScore},${user.level}`);
+    const worldTimeStr = JSON.stringify(user.worldTime || { correctAnswers: 0, totalHours: 0 });
+    lines.push(`${user.login},${user.passwordHash},${user.lastLogin},${user.totalScore},${user.level},${worldTimeStr}`);
   }
   writeFileSync(csvPath, lines.join("\n") + "\n", "utf-8");
 }

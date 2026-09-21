@@ -13,6 +13,11 @@ import { join } from "node:path";
 
 const TEST_CSV = join(process.cwd(), "data", "users.test.csv");
 
+beforeEach(() => {
+  cleanCsv();
+  initCsv();
+});
+
 function ensureDataDir(): void {
   const dataDir = join(process.cwd(), "data");
   if (!existsSync(dataDir)) {
@@ -31,7 +36,7 @@ function cleanCsv(): void {
 
 function initCsv(): void {
   ensureDataDir();
-  appendFileSync(TEST_CSV, "login,passwordHash,lastLogin,totalScore,level\n", "utf-8");
+  appendFileSync(TEST_CSV, "login,passwordHash,lastLogin,totalScore,level,worldTime\n", "utf-8");
 }
 
 describe("crypto", () => {
@@ -102,7 +107,7 @@ describe("csv", () => {
     it("читает пользователей из CSV", () => {
       appendFileSync(
         TEST_CSV,
-        "ivan,s5al7:h4sh,2026-09-14T10:30:00.000Z,42,1\n",
+        "ivan,s5al7:h4sh,2026-09-14T10:30:00.000Z,42,1,{}\n",
         "utf-8"
       );
       const users = readUsers();
@@ -122,11 +127,12 @@ describe("csv", () => {
           lastLogin: "2026-09-14T10:30:00.000Z",
           totalScore: 42,
           level: 1,
+          worldTime: { correctAnswers: 0, totalHours: 0 },
         },
       ];
       writeUsers(users);
       const content = readFileSync(TEST_CSV, "utf-8");
-      expect(content).toContain("ivan,salt:hash,2026-09-14T10:30:00.000Z,42,1");
+      expect(content).toContain("ivan,salt:hash,2026-09-14T10:30:00.000Z,42,1,{\"correctAnswers\":0,\"totalHours\":0}");
     });
   });
 
@@ -139,7 +145,7 @@ describe("csv", () => {
     it("находит пользователя по логину", () => {
       appendFileSync(
         TEST_CSV,
-        "maria,x9mp2:k3sh1,2026-09-13T15:20:00.000Z,17,1\n",
+        "maria,x9mp2:k3sh1,2026-09-13T15:20:00.000Z,17,1,{}\n",
         "utf-8"
       );
       const result = findUserByLogin("maria");
@@ -157,6 +163,7 @@ describe("csv", () => {
         lastLogin: "",
         totalScore: 0,
         level: 1,
+        worldTime: { correctAnswers: 0, totalHours: 0 },
       };
       addUser(user);
       const found = findUserByLogin("testuser");
@@ -169,7 +176,7 @@ describe("csv", () => {
     it("обновляет существующего пользователя", () => {
       appendFileSync(
         TEST_CSV,
-        "updateuser,oldhash,,0,1\n",
+        "updateuser,oldhash,,0,1,{}\n",
         "utf-8"
       );
       updateUser("updateuser", {

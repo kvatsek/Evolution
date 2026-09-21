@@ -23,6 +23,7 @@ import type {
   SaveScoreResponse,
   SubmitAnswerResponse,
   WeightEntry,
+  WorldTime,
 } from "./types";
 
 /** Парсит JSON тело запроса. */
@@ -93,6 +94,7 @@ export async function handleRegister(
     lastLogin: "",
     totalScore: 0,
     level: 1,
+    worldTime: { correctAnswers: 0, totalHours: 0 },
   });
 
   // Создаём папку пользователя с current.csv и solved.csv
@@ -104,6 +106,7 @@ export async function handleRegister(
       login,
       totalScore: 0,
       lastLogin: "",
+      worldTime: { correctAnswers: 0, totalHours: 0 },
     },
   };
 
@@ -147,6 +150,7 @@ export async function handleLogin(
       totalScore: user.totalScore,
       lastLogin: newLastLogin,
       level: user.level,
+      worldTime: user.worldTime,
     },
   };
 
@@ -167,8 +171,8 @@ export async function handleSaveScore(
     return;
   }
 
-  const body = (await parseBody(req)) as { score?: number };
-  const { score } = body;
+  const body = (await parseBody(req)) as { score?: number; correctAnswers?: number };
+  const { score, correctAnswers } = body;
   if (typeof score !== "number" || score < 0) {
     sendJson(res, 400, { error: "Укажите корректный счёт" });
     return;
@@ -188,6 +192,15 @@ export async function handleSaveScore(
 
   const newTotalScore = user.totalScore + score;
   updateUser(login, { totalScore: newTotalScore });
+
+  // Обновляем worldTime, если передано количество правильных ответов
+  if (typeof correctAnswers === "number" && correctAnswers > 0) {
+    const newWorldTime: WorldTime = {
+      correctAnswers: correctAnswers,
+      totalHours: Math.floor(correctAnswers / 10),
+    };
+    updateUser(login, { worldTime: newWorldTime });
+  }
 
   const response: SaveScoreResponse = {
     totalScore: newTotalScore,
@@ -228,6 +241,7 @@ export async function handleMe(
       totalScore: user.totalScore,
       lastLogin: user.lastLogin,
       level: user.level,
+      worldTime: user.worldTime,
     },
   };
 
@@ -265,8 +279,9 @@ export async function handleSubmitAnswer(
     expression?: string;
     correct?: boolean;
     correctStreak?: number;
+    correctAnswers?: number;
   };
-  const { expression, correct, correctStreak } = body;
+  const { expression, correct, correctStreak, correctAnswers } = body;
 
   if (typeof expression !== "string" || typeof correct !== "boolean") {
     sendJson(res, 400, { error: "Укажите выражение и результат ответа" });
@@ -356,6 +371,18 @@ export async function handleSubmitAnswer(
   }
 
   writeUserCurrentWeights(login, currentEntries);
+
+  // Обновляем worldTime, если передано количество правильных ответов
+  if (typeof correctAnswers === "number" && correct) {
+    const userForUpdate = findUserByLogin(login);
+    if (userForUpdate) {
+      const newWorldTime: WorldTime = {
+        correctAnswers: correctAnswers,
+        totalHours: Math.floor(correctAnswers / 10),
+      };
+      updateUser(login, { worldTime: newWorldTime });
+    }
+  }
 
   // Обновляем user, чтобы получить актуальный уровень
   const updatedUser = findUserByLogin(login);

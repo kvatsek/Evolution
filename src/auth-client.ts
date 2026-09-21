@@ -48,7 +48,8 @@ async function apiGet<T>(path: string): Promise<T> {
  * При ошибке вызывает onError (если передан) и выводит в консоль. */
 export async function saveScore(
   score: number,
-  onError?: (error: string) => void
+  onError?: (error: string) => void,
+  correctAnswers?: number
 ): Promise<void> {
   try {
     const token = getToken();
@@ -64,7 +65,7 @@ export async function saveScore(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ score }),
+      body: JSON.stringify({ score, correctAnswers }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -88,10 +89,11 @@ export async function register(login: string, password: string): Promise<{
   totalScore: number;
   lastLogin: string;
   level: number;
+  worldTime?: { correctAnswers: number; totalHours: number };
 }> {
   const data = await apiPost("/api/register", { login, password });
   const { user } = data as {
-    user: { login: string; totalScore: number; lastLogin: string; level?: number };
+    user: { login: string; totalScore: number; lastLogin: string; level?: number; worldTime?: { correctAnswers: number; totalHours: number } };
   };
   return { ...user, level: user.level ?? 1 };
 }
@@ -103,11 +105,11 @@ export async function register(login: string, password: string): Promise<{
 export async function login(
   login: string,
   password: string
-): Promise<{ login: string; totalScore: number; lastLogin: string; level: number }> {
+): Promise<{ login: string; totalScore: number; lastLogin: string; level: number; worldTime?: { correctAnswers: number; totalHours: number } }> {
   const data = await apiPost("/api/login", { login, password });
   const { token, user } = data as {
     token: string;
-    user: { login: string; totalScore: number; lastLogin: string; level?: number };
+    user: { login: string; totalScore: number; lastLogin: string; level?: number; worldTime?: { correctAnswers: number; totalHours: number } };
   };
   setToken(token);
   return { ...user, level: user.level ?? 1 };
@@ -118,14 +120,14 @@ export async function login(
  * Возвращает null, если не авторизован.
  */
 export async function me(): Promise<
-  | { login: string; totalScore: number; lastLogin: string; level: number }
+  | { login: string; totalScore: number; lastLogin: string; level: number; worldTime?: { correctAnswers: number; totalHours: number } }
   | null
 > {
   const token = getToken();
   if (!token) return null;
   try {
     const data = await apiGet<{
-      user: { login: string; totalScore: number; lastLogin: string; level?: number };
+      user: { login: string; totalScore: number; lastLogin: string; level?: number; worldTime?: { correctAnswers: number; totalHours: number } };
     }>("/api/me");
     return { ...data.user, level: data.user.level ?? 1 };
   } catch {
@@ -172,7 +174,8 @@ export async function loadWeights(): Promise<
 export async function submitAnswer(
   expression: string,
   correct: boolean,
-  correctStreak: number
+  correctStreak: number,
+  correctAnswers?: number
 ): Promise<{ weights: { expression: string; weight: number }[]; level?: number }> {
   const token = getToken();
   if (!token) {
@@ -186,7 +189,7 @@ export async function submitAnswer(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ expression, correct, correctStreak }),
+      body: JSON.stringify({ expression, correct, correctStreak, correctAnswers }),
     });
     const data = await res.json();
     if (!res.ok) {

@@ -1,4 +1,9 @@
 import { describe, expect, it, beforeEach } from "vitest";
+
+beforeEach(() => {
+  cleanCsv();
+  initCsv();
+});
 import { Readable } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
@@ -13,7 +18,7 @@ import {
 import { createSession } from "./session";
 import { appendFileSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { readUserCurrentWeights, readSolvedExamples } from "./csv";
+import { readUserCurrentWeights, readSolvedExamples, findUserByLogin } from "./csv";
 
 const TEST_CSV = join(process.cwd(), "data", "users.test.csv");
 
@@ -35,7 +40,7 @@ function cleanCsv(): void {
 
 function initCsv(): void {
   ensureDataDir();
-  appendFileSync(TEST_CSV, "login,passwordHash,lastLogin,totalScore,level\n", "utf-8");
+  appendFileSync(TEST_CSV, "login,passwordHash,lastLogin,totalScore,level,worldTime\n", "utf-8");
 }
 
 /** Создаёт IncomingMessage с JSON телом. */
@@ -530,6 +535,74 @@ describe("api", () => {
       // Проверяем, что пример удалён из current
       const currentAfter = readUserCurrentWeights("zeroweight");
       expect(currentAfter.some((e) => e.expression === "2+3")).toBe(false);
+    });
+  });
+
+  describe("handleSaveScore", () => {
+    it("возвращает 401 без токена", async () => {
+      const req = createMockReq({ score: 10 });
+      const mock = createMockRes();
+      await handleSaveScore(req, mock.res);
+
+      expect(mock._status).toBe(401);
+    });
+
+    it("сохраняет счёт пользователя", async () => {
+      // Сначала регистрируем пользователя
+      const regReq = createMockReq({ login: "testsavescor", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      const token = createSession("testsavescor").token;
+
+      // Сохраняем счёт
+      const scoreReq = createMockReq({ score: 15 }, { authorization: `Bearer ${token}` });
+      const scoreMock = createMockRes();
+      await handleSaveScore(scoreReq, scoreMock.res);
+
+      expect(scoreMock._status).toBe(200);
+      const parsed = JSON.parse(scoreMock._data);
+      expect(parsed.totalScore).toBe(15);
+    });
+
+    it("сохраняет worldTime при correctAnswers > 0", async () => {
+      // Сначала регистрируем пользователя
+      const regReq = createMockReq({ login: "worldtimetest", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      const token = createSession("worldtimetest").token;
+
+      // Сохраняем счёт с correctAnswers
+      const scoreReq = createMockReq({ score: 10, correctAnswers: 25 }, { authorization: `Bearer ${token}` });
+      const scoreMock = createMockRes();
+      await handleSaveScore(scoreReq, scoreMock.res);
+
+      expect(scoreMock._status).toBe(200);
+
+      // Проверяем, что worldTime сохранён в CSV
+      const user = findUserByLogin("worldtimetest");
+      expect(user?.worldTime).toEqual({ correctAnswers: 25, totalHours: 2 });
+    });
+
+    it("не обновляет worldTime при correctAnswers = 0", async () => {
+      // Сначала регистрируем пользователя
+      const regReq = createMockReq({ login: "notimeupdate", password: "secret" });
+      const regMock = createMockRes();
+      await handleRegister(regReq, regMock.res);
+
+      const token = createSession("notimeupdate").token;
+
+      // Сохраняем счёт с correctAnswers = 0
+      const scoreReq = createMockReq({ score: 10, correctAnswers: 0 }, { authorization: `Bearer ${token}` });
+      const scoreMock = createMockRes();
+      await handleSaveScore(scoreReq, scoreMock.res);
+
+      expect(scoreMock._status).toBe(200);
+
+      // Проверяем, что worldTime не изменился (остался начальным)
+      const user = findUserByLogin("notimeupdate");
+      expect(user?.worldTime).toEqual({ correctAnswers: 0, totalHours: 0 });
     });
   });
 });
