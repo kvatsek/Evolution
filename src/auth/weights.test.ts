@@ -11,6 +11,12 @@ import {
   getUnsolvedExamplesFromLevel,
   createUserLevelFiles,
   advanceLevel,
+  checkLevelAdvance,
+  ensureUserLevelMigration,
+  INITIAL_WEIGHT,
+  getUserDataDir,
+  getUserCurrentWeightsPath,
+  getUserSolvedPath,
 } from "./csv";
 
 describe("user level files", () => {
@@ -208,6 +214,99 @@ describe("user level files", () => {
       expect(unsolved).not.toContain("1+2");
       expect(unsolved).not.toContain("3+4");
       expect(unsolved.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("INITIAL_WEIGHT", () => {
+    it("равен 5", () => {
+      expect(INITIAL_WEIGHT).toBe(5);
+    });
+  });
+
+  describe("getUserDataDir", () => {
+    it("возвращает путь к папке пользователя", () => {
+      const dir = getUserDataDir("ivan");
+      expect(dir).toBe(join(process.cwd(), "data", "ivan"));
+    });
+
+    it("корректно обрабатывает логины с кириллицей", () => {
+      const dir = getUserDataDir("Анна");
+      expect(dir).toBe(join(process.cwd(), "data", "Анна"));
+    });
+  });
+
+  describe("getUserCurrentWeightsPath", () => {
+    it("возвращает путь к current.csv", () => {
+      const path = getUserCurrentWeightsPath("bob");
+      expect(path).toBe(join(process.cwd(), "data", "bob", "current.csv"));
+    });
+  });
+
+  describe("getUserSolvedPath", () => {
+    it("возвращает путь к solved.csv", () => {
+      const path = getUserSolvedPath("charlie");
+      expect(path).toBe(join(process.cwd(), "data", "charlie", "solved.csv"));
+    });
+  });
+
+  describe("checkLevelAdvance", () => {
+    it("возвращает null для пользователя на максимальном уровне", () => {
+      // Создаём пользователя с level=4
+      appendFileSync(
+        join(process.cwd(), "data", "users.test.csv"),
+        "maxleveluser,salt:hash,,0,4\n",
+        "utf-8"
+      );
+
+      const entries: any[] = [{ expression: "1+2", weight: 0, level: 4 }];
+      const solved: any[] = [];
+
+      const result = checkLevelAdvance("maxleveluser", entries, solved);
+      expect(result).toBeNull();
+    });
+
+    it("возвращает null если нет примера с весом 0", () => {
+      appendFileSync(
+        join(process.cwd(), "data", "users.test.csv"),
+        "nozeroweightuser,salt:hash,,0,1\n",
+        "utf-8"
+      );
+
+      const entries: any[] = [
+        { expression: "1+2", weight: 3, level: 1 },
+        { expression: "3+4", weight: 5, level: 1 },
+      ];
+      const solved: any[] = [];
+
+      const result = checkLevelAdvance("nozeroweightuser", entries, solved);
+      expect(result).toBeNull();
+    });
+
+    it("возвращает следующий уровень если есть вес 0 и все предыдущие уровни решены", () => {
+      // Создаём пользователя с level=1
+      appendFileSync(
+        join(process.cwd(), "data", "users.test.csv"),
+        "advanceuser,salt:hash,,0,1\n",
+        "utf-8"
+      );
+
+      // Пример с весом 0
+      const entries: any[] = [
+        { expression: "1+2", weight: 0, level: 1 },
+        { expression: "3+4", weight: 5, level: 1 },
+      ];
+      // Решённые примеры предыдущего уровня (для level=1 нет предыдущих)
+      const solved: any[] = [];
+
+      const result = checkLevelAdvance("advanceuser", entries, solved);
+      expect(result).toBe(2);
+    });
+  });
+
+  describe("ensureUserLevelMigration", () => {
+    it("не бросает ошибку при отсутствии файлов миграции", () => {
+      // Функция должна просто пройти по пользователям и не упасть
+      expect(() => ensureUserLevelMigration()).not.toThrow();
     });
   });
 });
