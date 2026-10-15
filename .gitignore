@@ -5,3 +5,7 @@ dist
 .idea
 log.txt
 log_1.txt
+data/bacteria.csv
+data/users.csv
+gif/бактерии/
+

@@ -13,6 +13,7 @@ import {
   handleSubmitAnswer,
 } from "./auth/api.js";
 import { ensureUserLevelMigration } from "./auth/csv.js";
+import { ensureBacteriaCsv } from "./bacteria.js";
 
 /** Маршрутизирует API запросы к соответствующим обработчикам. */
 async function handleApiRequest(
@@ -103,6 +104,9 @@ export async function startServer(): Promise<void> {
 
   // Миграция существующих пользователей
   ensureUserLevelMigration();
+
+  // Генерация CSV со списком бактерий
+  ensureBacteriaCsv();
 
   const { server, vite: viteServer } = await createApp();
 
